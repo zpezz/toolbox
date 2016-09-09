@@ -199,6 +199,11 @@ function [objs,bbs] = bbLoad( fName, varargin )
 %   .xRng     - [] range of x coordinates of bb extent
 %   .yRng     - [] range of y coordinates of bb extent
 %   .vRng     - [] range of acceptable obj occlusion levels
+%   .name     - [] regexp on image source name to ignore
+%   .invName  - [0] invert behavior of name, setting non-matches ignore
+%   .database - [] regexp on database name to ignore
+%   .invData  - [0] invert behavior of database, setting non-matches to
+%               ignore
 %
 % OUTPUTS
 %  objs     - loaded objects
@@ -210,11 +215,16 @@ function [objs,bbs] = bbLoad( fName, varargin )
 
 % get parameters
 df={'format',0,'ellipse',1,'squarify',[],'lbls',[],'ilbls',[],'hRng',[],...
-  'wRng',[],'aRng',[],'arRng',[],'oRng',[],'xRng',[],'yRng',[],'vRng',[]};
-[format,ellipse,sqr,lbls,ilbls,hRng,wRng,aRng,arRng,oRng,xRng,yRng,vRng]...
+  'wRng',[],'aRng',[],'arRng',[],'oRng',[],'xRng',[],'yRng',[],...
+  'vRng',[],...
+  'name',[],'invName',0,'database',[],'invData',0};
+[format,ellipse,sqr,lbls,ilbls,hRng,wRng,aRng,arRng,oRng,xRng,yRng,vRng,...
+  name,invName,database,invData]...
   = getPrmDflt(varargin,df,1);
 
 % load objs
+nameVal = [];
+dbVal = [];
 if( format==0 )
   % load objs stored in default format
   fId=fopen(fName);
@@ -237,19 +247,26 @@ elseif( format==1 )
   % load objs stored in PASCAL VOC format
   if(exist('PASreadrecord.m','file')~=2)
     error('bbLoad() requires the PASCAL VOC code.'); end
-  os=PASreadrecord(fName); os=os.objects;
+  parsed=PASreadrecord(fName);
+  nameVal = parsed.source.image;
+  dbVal = parsed.database;
+  os=parsed.objects;
   n=length(os); objs=create(n);
   if(~isfield(os,'occluded')), for i=1:n, os(i).occluded=0; end; end
   for i=1:n
     bb=os(i).bbox; bb(3)=bb(3)-bb(1); bb(4)=bb(4)-bb(2); objs(i).bb=bb;
-    objs(i).lbl=os(i).class; objs(i).ign=os(i).difficult;
+    objs(i).lbl=os(i).class; 
+    objs(i).ign=os(i).difficult;
     objs(i).occ=os(i).occluded || os(i).truncated;
     if(objs(i).occ), objs(i).bbv=bb; end
   end
 elseif( format==2 )
   if(exist('VOCreadxml.m','file')~=2)
     error('bbLoad() requires the ImageNet dev code.'); end
-  os=VOCreadxml(fName); os=os.annotation;
+  parsed=VOCreadxml(fName);
+  nameVal = parsed.annotation.source.image;
+  dbVal = parsed.annotation.source.database;
+  os=parsed.annotation;
   if(isfield(os,'object')), os=os.object; else os=[]; end
   n=length(os); objs=create(n);
   for i=1:n
@@ -258,6 +275,20 @@ elseif( format==2 )
     objs(i).lbl=os(i).name;
   end
 else error('bbLoad() unknown format: %i',format);
+end
+
+% Filter on image source and database name
+filteredAll = false;
+if ~isempty(nameVal) && ~isempty(name)
+  match = regexp(nameVal, name, 'once');
+  filteredAll = filteredAll | xor(numel(match), invName);
+end
+if ~isempty(dbVal) && ~isempty(database)
+  match = regexp(dbVal, database, 'once');
+  filteredAll = filteredAll | xor(numel(match), invData);
+end
+if filteredAll
+  for i=1:n, objs(i).ign = 1; end
 end
 
 % only keep objects whose lbl is in lbls or ilbls
