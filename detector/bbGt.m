@@ -204,6 +204,13 @@ function [objs,bbs] = bbLoad( fName, varargin )
 %   .database - [] regexp on database name to ignore
 %   .invData  - [0] invert behavior of database, setting non-matches to
 %               ignore
+%   .ignDiff  - [1] ignore labels marked as "difficult" in Pascal VOC
+%               format (1). Has no effect in other formats. Valid values
+%               and effects on use of difficult lables are
+%               0  - labels are used as normal
+%               1  - labels are set to ignore
+%               -1 - difficult labels are used, and all labels not set as 
+%                    difficult are set to ignore
 %
 % OUTPUTS
 %  objs     - loaded objects
@@ -217,9 +224,9 @@ function [objs,bbs] = bbLoad( fName, varargin )
 df={'format',0,'ellipse',1,'squarify',[],'lbls',[],'ilbls',[],'hRng',[],...
   'wRng',[],'aRng',[],'arRng',[],'oRng',[],'xRng',[],'yRng',[],...
   'vRng',[],...
-  'name',[],'invName',0,'database',[],'invData',0};
+  'name',[],'invName',0,'database',[],'invData',0,'ignDiff',1};
 [format,ellipse,sqr,lbls,ilbls,hRng,wRng,aRng,arRng,oRng,xRng,yRng,vRng,...
-  name,invName,database,invData]...
+  name,invName,database,invData,ignDiff]...
   = getPrmDflt(varargin,df,1);
 
 % load objs
@@ -255,8 +262,16 @@ elseif( format==1 )
   if(~isfield(os,'occluded')), for i=1:n, os(i).occluded=0; end; end
   for i=1:n
     bb=os(i).bbox; bb(3)=bb(3)-bb(1); bb(4)=bb(4)-bb(2); objs(i).bb=bb;
-    objs(i).lbl=os(i).class; 
-    objs(i).ign=os(i).difficult;
+    objs(i).lbl=os(i).class;
+    switch ignDiff
+      case 1
+        objs(i).ign=os(i).difficult;
+      case -1
+        objs(i).ign=not(os(i).difficult);
+      case 0
+      otherwise
+        error('Invalid value for ignDiff')
+    end
     objs(i).occ=os(i).occluded || os(i).truncated;
     if(objs(i).occ), objs(i).bbv=bb; end
   end
