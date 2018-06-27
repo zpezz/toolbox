@@ -198,6 +198,7 @@ function [objs,bbs] = bbLoad( fName, varargin )
 %   .oRng     - [] range of acceptable obj orientations (angles)
 %   .xRng     - [] range of x coordinates of bb extent
 %   .yRng     - [] range of y coordinates of bb extent
+%   .zRng     - [] range of acceptable z point coordinates
 %   .vRng     - [] range of acceptable obj occlusion levels
 %   .name     - [] regexp on image source name to ignore
 %   .invName  - [0] invert behavior of name, setting non-matches ignore
@@ -223,9 +224,9 @@ function [objs,bbs] = bbLoad( fName, varargin )
 % get parameters
 df={'format',0,'ellipse',1,'squarify',[],'lbls',[],'ilbls',[],'hRng',[],...
   'wRng',[],'aRng',[],'arRng',[],'oRng',[],'xRng',[],'yRng',[],...
-  'vRng',[],...
+  'zRng',[],'vRng',[],...
   'name',[],'invName',0,'database',[],'invData',0,'ignDiff',1};
-[format,ellipse,sqr,lbls,ilbls,hRng,wRng,aRng,arRng,oRng,xRng,yRng,vRng,...
+[format,ellipse,sqr,lbls,ilbls,hRng,wRng,aRng,arRng,oRng,xRng,yRng,zRng,vRng,...
   name,invName,database,invData,ignDiff]...
   = getPrmDflt(varargin,df,1);
 
@@ -260,6 +261,13 @@ elseif( format==1 )
   os=parsed.objects;
   n=length(os); objs=create(n);
   if(~isfield(os,'occluded')), for i=1:n, os(i).occluded=0; end; end
+  for i=1:n
+    if(isfield(os(i),'point')) && isfield(os(i).point, 'z')
+      objs(i).z=os(i).point.z;
+    else
+      objs(i).z=nan;
+    end; 
+  end
   for i=1:n
     bb=os(i).bbox; bb(3)=bb(3)-bb(1); bb(4)=bb(4)-bb(2); objs(i).bb=bb;
     objs(i).lbl=os(i).class;
@@ -339,6 +347,8 @@ if(~isempty(vRng)),  for i=1:n, o=objs(i); bb=o.bb; bbv=o.bbv; %#ok<ALIGN>
       v=(bbv(3)*bbv(4))/(bb(3)*bb(4)); end
     objs(i).ign = objs(i).ign || v<vRng(1) || v>vRng(2); end
 end
+if(~isempty(zRng)),  for i=1:n, v=objs(i).z; % Handle NaN entries
+    objs(i).ign = objs(i).ign || ~(v>zRng(1) && v<zRng(2)); end; end
 
 % finally get extent of each bounding box (not trivial if ang~=0)
 if(nargout<=1), return; end; if(n==0), bbs=zeros(0,5); return; end

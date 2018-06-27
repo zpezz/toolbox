@@ -103,8 +103,8 @@ if isfield(o,'point')
     p.haspoint=true;
     p.point.x=str2double(o.point.x);
     p.point.y=str2double(o.point.y);
-    if isfield(o.point,'d')
-        p.point.d=str2double(o.point.d);
+    if isfield(o.point,'z')
+        p.point.z=str2double(o.point.z);
     end
 else
     p.point=[];
